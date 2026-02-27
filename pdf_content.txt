@@ -1,0 +1,72 @@
+﻿Assignment: AI Document Classifier Mobile App (Lite)
+Objective
+Build a mobile application that allows a user to capture or upload a document image, extract
+text, classify the document, extract key metadata, and store it in a searchable library.
+The app should be deployable to both Android and iOS (TestFlight or submission-ready).
+Core Features (Must Have)
+1. Upload Document
+ΓùÅ Capture image using camera
+ΓùÅ Select image from gallery
+(Images only ΓÇö PDF support is not required)
+2. OCR Processing
+Extract text from the image using any approach (Google ML Kit, Tesseract, Vision API, or
+similar).
+3. Document Classification
+Classify the document into one of the following categories:
+ΓùÅ Invoice/Bill
+ΓùÅ Prescription
+ΓùÅ Lab Report
+ΓùÅ ID Proof
+ΓùÅ Insurance
+ΓùÅ Other
+4. Metadata Extraction
+Extract the following fields (use "not found" if unavailable):
+ΓùÅ document_date
+ΓùÅ person_name
+ΓùÅ provider_name
+ΓùÅ document_number
+ΓùÅ amount
+5. Document Library
+ΓùÅ List all uploaded documents
+ΓùÅ Search by name/provider
+ΓùÅ Filter by category
+6. Document Detail Screen
+ΓùÅ Preview image
+ΓùÅ View extracted metadata
+ΓùÅ Edit and save metadata
+AI Requirement
+You must implement at least one real AI or intelligent processing component (not fully mocked).
+This can be:
+ΓùÅ LLM-based classification
+ΓùÅ Keyword or rule-based model
+ΓùÅ Python microservice
+ΓùÅ Any other reasonable approach
+Deployment Requirement
+Please provide proof of deployment:
+Android
+ΓùÅ Play Store Internal Testing link OR submission screenshot
+iOS
+ΓùÅ TestFlight build OR submission-ready build
+Also include:
+ΓùÅ Bundle/package name
+ΓùÅ Version number
+ΓùÅ Privacy policy link (simple page is fine)
+Deliverables
+Please submit the following:
+1. GitHub repository
+2. README including:
+Γùï Setup instructions
+Γùï Architecture overview
+Γùï Explanation of AI approach
+Γùï Trade-offs and future improvements
+3. Short Loom/video walkthrough (3ΓÇô5 minutes)
+4. Store deployment proof
+Timeline
+You will have 7 days from the time you start the assignment.
+Evaluation Criteria
+We will evaluate based on:
+ΓùÅ Functionality and completeness
+ΓùÅ Code quality and structure
+ΓùÅ AI implementation approach
+ΓùÅ User experience
+ΓùÅ Deployment readiness
