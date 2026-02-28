@@ -61,7 +61,13 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
-          ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(widget.doc.imagePath))),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _FullScreenImage(widget.doc.imagePath))),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16), 
+              child: Hero(tag: 'docImg', child: Image.file(File(widget.doc.imagePath))),
+            ),
+          ),
           const SizedBox(height: 16),
           _field('Name', _cName, Icons.person, color),
           _field('Provider', _cProvider, Icons.business, color),
@@ -86,6 +92,26 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
           _editing ? TextField(controller: ctrl, decoration: const InputDecoration(isDense: true, border: InputBorder.none)) : Text(ctrl.text, style: const TextStyle(fontWeight: FontWeight.bold)),
         ])),
       ]),
+    );
+  }
+}
+
+class _FullScreenImage extends StatelessWidget {
+  final String path;
+  const _FullScreenImage(this.path);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: Colors.white, elevation: 0),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Hero(tag: 'docImg', child: Image.file(File(path))),
+        ),
+      ),
     );
   }
 }

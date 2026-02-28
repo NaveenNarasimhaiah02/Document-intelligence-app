@@ -9,6 +9,7 @@ import '../services/extraction_service.dart';
 import 'detail_screen.dart';
 import 'login_screen.dart';
 import '../widgets/animated_scanning_logo.dart';
+import '../widgets/scanning_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   final StorageService storage;
@@ -82,11 +83,39 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      // Calculate checksum of the picked image
+      final checksum = await widget.storage.calculateChecksum(_currentImage!);
+      final existing = widget.storage.findDocumentByChecksum(checksum);
+      
+      if (existing != null) {
+        _showError(
+          title: 'Duplicate Document',
+          message: 'This image has already been scanned.',
+          icon: Icons.copy_all_rounded,
+        );
+        return;
+      }
+
       final permanentPath = await widget.storage.persistImage(_currentImage!);
       final permanentFile = File(permanentPath);
 
-      final doc = await _extraction.processImage(permanentFile);
-      if (doc != null) {
+      // Mandatory 2-second delay for the "wow" scanning animation
+      await Future.delayed(const Duration(seconds: 2));
+
+      final extracted = await _extraction.processImage(permanentFile);
+      if (extracted != null) {
+        // Create final doc with checksum
+        final doc = DocumentModel(
+          id: extracted.id,
+          imagePath: extracted.imagePath,
+          type: extracted.type,
+          date: extracted.date,
+          personName: extracted.personName,
+          providerName: extracted.providerName,
+          documentNumber: extracted.documentNumber,
+          amount: extracted.amount,
+          checksum: checksum,
+        );
         await widget.storage.saveDocument(doc);
         _load();
       } else {
@@ -143,6 +172,57 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       setState(() => _processing = false);
     }
+  }
+
+  void _showPickSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: AC.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: AC.textS.withAlpha(50), borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 24),
+            const Text('Scan Document', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AC.textP)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                _PickOption(
+                  icon: Icons.camera_alt_rounded,
+                  label: 'Camera',
+                  color: Colors.blue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pick(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(width: 16),
+                _PickOption(
+                  icon: Icons.photo_library_rounded,
+                  label: 'Gallery',
+                  color: Colors.purple,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pick(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
   }
 
   void _confirmClear() {
@@ -218,91 +298,135 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AC.bg,
-      body: CustomScrollView(slivers: [
-        SliverAppBar(
-          expandedHeight: 165, pinned: true, backgroundColor: AC.header1,
-          flexibleSpace: FlexibleSpaceBar(
-            background: Container(
-              decoration: const BoxDecoration(gradient: LinearGradient(colors: [AC.header1, AC.header2])),
-              child: SafeArea(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const SizedBox(height: 10),
-                    Row(children: [
-                      const AnimatedScanningLogo(size: 44),
-                      const SizedBox(width: 14),
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('SmartScan', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                        Text('Snap. Scan. Done.', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13, letterSpacing: 0.5)),
-                      ]),
-                      const Spacer(),
-                      GestureDetector(onTap: _showProfileSheet, child: const CircleAvatar(radius: 20, backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white, size: 20))),
+      body: Stack(
+        children: [
+          CustomScrollView(slivers: [
+            SliverAppBar(
+              expandedHeight: 165, pinned: true, backgroundColor: AC.header1,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(gradient: LinearGradient(colors: [AC.header1, AC.header2])),
+                  child: SafeArea(child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const SizedBox(height: 10),
+                        Row(children: [
+                          const AnimatedScanningLogo(size: 44),
+                          const SizedBox(width: 14),
+                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('SmartScan', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                            Text('Snap. Scan. Done.', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13, letterSpacing: 0.5)),
+                          ]),
+                          const Spacer(),
+                          GestureDetector(onTap: _showProfileSheet, child: const CircleAvatar(radius: 20, backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white, size: 20))),
+                        ]),
+                        const SizedBox(height: 24),
+                        Row(children: [
+                          _QuickAction(icon: Icons.camera_alt, label: 'Scan', onTap: () => _pick(ImageSource.camera)),
+                          const SizedBox(width: 10),
+                          _QuickAction(icon: Icons.photo_library, label: 'Gallery', onTap: () => _pick(ImageSource.gallery)),
+                          const SizedBox(width: 10),
+                          _QuickAction(icon: Icons.search, label: 'Search', onTap: () => FocusScope.of(context).requestFocus(FocusNode())), // Focus search field
+                          const SizedBox(width: 10),
+                          _QuickAction(icon: Icons.delete_sweep, label: 'Clear All', onTap: _confirmClear),
+                        ]),
                     ]),
-                    const SizedBox(height: 24),
-                    Row(children: [
-                      _QuickAction(icon: Icons.camera_alt, label: 'Scan', onTap: () => _pick(ImageSource.camera)),
-                      const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.photo_library, label: 'Gallery', onTap: () => _pick(ImageSource.gallery)),
-                      const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.search, label: 'Search', onTap: () => FocusScope.of(context).requestFocus(FocusNode())), // Focus search field
-                      const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.delete_sweep, label: 'Clear All', onTap: _confirmClear),
-                    ]),
-                ]),
+                  )),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _search,
+                decoration: InputDecoration(
+                  hintText: 'Search by name, provider, or type...',
+                  prefixIcon: const Icon(Icons.search, size: 22),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  fillColor: Colors.white,
+                ),
+              ),
+            )),
+            SliverToBoxAdapter(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: _cats.map((c) => Padding(padding: const EdgeInsets.only(left: 16), child: ChoiceChip(label: Text(c), selected: _category == c, onSelected: (s) { if(s) setState(() { _category = c; _filter(); }); }, selectedColor: AC.header2, labelStyle: TextStyle(color: _category == c ? Colors.white : AC.textP, fontWeight: FontWeight.bold)))).toList()))),
+            SliverToBoxAdapter(child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              child: Row(
+                children: [
+                  const Text('All Documents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AC.textP)),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                    decoration: BoxDecoration(color: AC.header2.withAlpha(30), borderRadius: BorderRadius.circular(12)),
+                    child: Text('${_filtered.length}', style: const TextStyle(color: AC.header2, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ],
+              ),
+            )),
+            
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              sliver: SliverList(delegate: SliverChildBuilderDelegate(
+                (_, i) {
+                  final d = _filtered[i];
+                  return _DocCard(
+                    doc: d, 
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentDetailScreen(doc: d, storage: widget.storage))).then((_) => _load()),
+                    onDelete: () => _delete(d.id),
+                    isSelected: _selected.contains(d.id),
+                    onLongPress: () => setState(() => _selected.add(d.id)),
+                  );
+                },
+                childCount: _filtered.length,
               )),
             ),
-          ),
-        ),
-        SliverToBoxAdapter(child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: 'Search by name, provider, or type...',
-              prefixIcon: const Icon(Icons.search, size: 22),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-              fillColor: Colors.white,
-            ),
-          ),
-        )),
-        SliverToBoxAdapter(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: _cats.map((c) => Padding(padding: const EdgeInsets.only(left: 16), child: ChoiceChip(label: Text(c), selected: _category == c, onSelected: (s) { if(s) setState(() { _category = c; _filter(); }); }, selectedColor: AC.header2, labelStyle: TextStyle(color: _category == c ? Colors.white : AC.textP, fontWeight: FontWeight.bold)))).toList()))),
-        SliverToBoxAdapter(child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-          child: Row(
-            children: [
-              const Text('All Documents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AC.textP)),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                decoration: BoxDecoration(color: AC.header2.withAlpha(30), borderRadius: BorderRadius.circular(12)),
-                child: Text('${_filtered.length}', style: const TextStyle(color: AC.header2, fontWeight: FontWeight.bold, fontSize: 13)),
-              ),
-            ],
-          ),
-        )),
-        if (_processing) SliverToBoxAdapter(child: const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Center(child: CircularProgressIndicator()))),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          sliver: SliverList(delegate: SliverChildBuilderDelegate(
-            (_, i) {
-              final d = _filtered[i];
-              return _DocCard(
-                doc: d, 
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentDetailScreen(doc: d, storage: widget.storage))).then((_) => _load()),
-                onDelete: () => _delete(d.id),
-                isSelected: _selected.contains(d.id),
-                onLongPress: () => setState(() => _selected.add(d.id)),
-              );
-            },
-            childCount: _filtered.length,
-          )),
-        ),
-      ]),
+          ]),
+          if (_processing && _currentImage != null)
+            ScanningOverlay(image: _currentImage!),
+        ],
+      ),
       bottomNavigationBar: _isSelecting ? Container(
         color: AC.surface, padding: const EdgeInsets.all(16),
         child: ElevatedButton.icon(onPressed: _deleteSelected, icon: const Icon(Icons.delete), label: const Text('Delete Selected'), style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white)),
       ) : null,
-      floatingActionButton: _isSelecting ? null : FloatingActionButton(onPressed: () => _pick(ImageSource.camera), child: const Icon(Icons.add), backgroundColor: AC.header2),
+      floatingActionButton: _isSelecting ? null : FloatingActionButton(
+        onPressed: _showPickSheet,
+        backgroundColor: AC.header2,
+        child: const Icon(Icons.add, size: 28),
+      ),
+    );
+  }
+}
+
+class _PickOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _PickOption({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            color: color.withAlpha(20),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withAlpha(30)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 8),
+              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

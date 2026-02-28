@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import '../models/document.dart';
 
 class StorageService {
@@ -109,5 +109,18 @@ class StorageService {
     }
     await _docsBox.clear();
     _cachedDocs = null;
+  }
+
+  Future<String> calculateChecksum(File file) async {
+    final bytes = await file.readAsBytes();
+    return sha256.convert(bytes).toString();
+  }
+
+  DocumentModel? findDocumentByChecksum(String checksum) {
+    final docs = getAllDocuments();
+    for (final doc in docs) {
+      if (doc.checksum == checksum) return doc;
+    }
+    return null;
   }
 }
